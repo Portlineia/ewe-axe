@@ -1,0 +1,22 @@
+{
+  "name": "Ewé Axé",
+  "short_name": "Ewé Axé",
+  "description": "Seu terreiro virtual e catálogo de ervas, rituais e banhos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAFA",
+  "theme_color": "#047857",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://api.iconify.design/lucide:leaf.svg?color=%23047857",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://api.iconify.design/lucide:leaf.svg?color=%23047857",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

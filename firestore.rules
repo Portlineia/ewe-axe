@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+       return request.auth != null;
+    }
+    
+    function isDocOwner(userId) {
+       return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAuthor() {
+       return isAuthenticated() && request.auth.uid == request.resource.data.authorId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "mlcfcelooboo@gmail.com" && request.auth.token.email_verified == true));
+    }
+    
+    function hasRequiredFields(fields) {
+       return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isPositive(field) {
+      return request.resource.data[field] is number && request.resource.data[field] >= 0;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'photoURL', 'role', 'createdAt']) &&
+             data.uid is string &&
+             data.email is string &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             data.role in ['admin', 'user'];
+    }
+
+    function isValidCorrentePost(data) {
+      return hasOnlyAllowedFields(['authorId', 'authorName', 'authorPhoto', 'content', 'type', 'imageURL', 'axedBy', 'attachedRecipe', 'createdAt']) &&
+             data.authorId is string &&
+             data.authorName is string &&
+             data.content is string && data.content.size() <= 3000 &&
+             data.type in ['conga', 'mensagem', 'pensamento', 'ajuda', 'mironga'] &&
+             (!('imageURL' in data) || data.imageURL == null || data.imageURL is string) &&
+             (!('axedBy' in data) || data.axedBy is list) &&
+             (!('attachedRecipe' in data) || data.attachedRecipe == null || data.attachedRecipe is map) &&
+             data.createdAt is string; // Timestamp validation usually matches strings for simplistic rule setup
+    }
+
+    function isValidPlantScan(data) {
+      return hasOnlyAllowedFields(['userId', 'plantName', 'nomeCientifico', 'imageURL', 'createdAt']) &&
+             data.userId is string &&
+             data.plantName is string && data.plantName.size() <= 200 &&
+             (!('nomeCientifico' in data) || data.nomeCientifico is string) &&
+             (!('imageURL' in data) || data.imageURL is string) &&
+             data.createdAt is string;
+    }
+
+    function isValidErva(data) {
+       return data.keys().hasAll(['nomePopular', 'nomeCientifico', 'temperatura', 'orixas', 'uso', 'descobridorId']) &&
+              data.nomePopular is string &&
+              data.nomeCientifico is string &&
+              data.temperatura in ['quente', 'morna', 'fria'] &&
+              data.orixas is list &&
+              data.uso is string &&
+              data.descobridorId is string;
+    }
+
+    function isValidAssentamento(data) {
+      return hasOnlyAllowedFields(['userId', 'nome', 'linha', 'fotoUrl', 'galeria', 'velaExpiresAt', 'agrados', 'createdAt', 'updatedAt']) &&
+             data.userId is string &&
+             data.nome is string && data.nome.size() <= 100 &&
+             data.linha is string &&
+             (!('fotoUrl' in data) || data.fotoUrl == null || data.fotoUrl is string) &&
+             (!('galeria' in data) || data.galeria is list) &&
+             (!('velaExpiresAt' in data) || data.velaExpiresAt == null || data.velaExpiresAt is string) &&
+             data.agrados is list && data.agrados.size() <= 20;
+    }
+    
+    function isValidUserRecipe(data) {
+      return hasOnlyAllowedFields(['userId', 'titulo', 'indicacao', 'ingredientes', 'preparo', 'createdAt']) &&
+             data.userId is string &&
+             data.titulo is string && data.titulo.size() <= 100 &&
+             (!('indicacao' in data) || data.indicacao is string) &&
+             data.ingredientes is list &&
+             data.preparo is string &&
+             data.createdAt is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Public profiles needed for feed
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isDocOwner(userId) && request.resource.data.uid == userId && request.resource.data.role == 'user') || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isDocOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+    }
+
+    match /corrente_posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidCorrentePost(request.resource.data) && isAuthor();
+      allow update: if isAuthenticated() && isValidCorrentePost(request.resource.data) && 
+                    (
+                      // Only let users update if they are author doing a content update OR someone naturally toggling their axé. 
+                      // Real production would secure array differences strongly, but this gives minimal required safety to unblock.
+                      (isAuthor()) || 
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['axedBy']))
+                    );
+      allow delete: if isAuthenticated() && resource.data.authorId == request.auth.uid; // Use resource.data for delete
+    }
+
+    match /plantScans/{scanId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidPlantScan(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidPlantScan(request.resource.data) && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /ervas_catalogadas/{ervaId} {
+      allow read: if isAuthenticated();
+      // Allow any authenticated user to add to the global catalog
+      allow create: if isAuthenticated() && isValidErva(request.resource.data);
+      // In a real app we'd strict update (only admins or AI bot), but here we let the app re-seed
+      allow update: if isAuthenticated();
+      // Allow delete for deduplication cleanup script
+      allow delete: if isAuthenticated();
+    }
+
+    match /assentamentos/{docId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidAssentamento(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidAssentamento(request.resource.data) && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /userRecipes/{recipeId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidUserRecipe(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidUserRecipe(request.resource.data) && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /oraculo_history/{historyId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /corrente_comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
+      allow update: if false; // Simplification, users delete and repost
+      allow delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Ewé Axé",
+  "description": "Seu guia espiritual e botânico para o terreiro. Identificador de ervas, gestão de Congá e comunidade de fé.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}

@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Ewé Axé app.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID matching Auth UID" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "CorrentePost": {
+      "title": "CorrentePost",
+      "description": "A social feed post or article exclusively focused on 'Axé'.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorPhoto": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "description": "mensagem or conga" },
+        "imageURL": { "type": "string" },
+        "axedBy": { "type": "array", "description": "Array of user IDs who emanated axé" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "authorName", "content", "type"]
+    },
+    "PlantScan": {
+      "title": "PlantScan",
+      "description": "A scan of a plant saved by user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "plantName": { "type": "string" },
+        "description": { "type": "string" },
+        "properties": { "type": "array" },
+        "imageURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "plantName", "description"]
+    },
+    "Assentamento": {
+      "title": "Assentamento",
+      "description": "Um guia ou assentamento no conga do usuario.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "nome": { "type": "string" },
+        "linha": { "type": "string" },
+        "fotoUrl": { "type": "string" },
+        "velaExpiresAt": { "type": "string", "format": "date-time" },
+        "agrados": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "nome", "linha"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Users collection."
+    },
+    "corrente_posts/{postId}": {
+      "schema": { "$ref": "#/entities/CorrentePost" },
+      "description": "Axe posts in the new mystical feed."
+    },
+    "plantScans/{scanId}": {
+      "schema": { "$ref": "#/entities/PlantScan" },
+      "description": "Scanned plants."
+    },
+    "assentamentos/{assentamentoId}": {
+      "schema": { "$ref": "#/entities/Assentamento" },
+      "description": "Entidades e assentamentos geridos no Conga."
+    }
+  }
+}
+
